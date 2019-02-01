@@ -1,0 +1,916 @@
+
+
+Option Compare Database
+Option Explicit
+Option Base 0
+Public my_rscurlock As New Collection
+Private my_db As ado_sql_database_class
+Private prpProp As ADODB.Property
+Dim mycommand As New ADODB.Command
+Dim myparameter As New ADODB.Parameter
+'Private myparameter As Variant
+Dim myrecordset As New ADODB.Recordset
+
+Dim row As Variant
+Dim col As Variant
+'Application
+Public mycollection As New VBA.Collection
+ 
+Private objAccess As Access.Application
+Private objExcel As Excel.Application
+Private objExcelWorkBook As Excel.Workbook
+Private WithEvents db As ADODB.Connection
+
+Public myrs As ADODB.Recordset
+Dim my_item As Variant
+Private my_sqlpackage As sqlpackagepart_class
+
+Private mykey As String
+Private my_parameter As Variant
+
+Dim mystring As String
+Private myitem As Variant
+
+Public Enum eConnection
+    mysql_aws_vbext = 0 'mysql at amazon vbext database
+    mysql_aws_wynk = 1 'mysql at amazon wynk database
+    mysql_____local = 2 'mysql local
+    access_____local = 3 'access jet local
+    msss_aws_wynk = 4 'sql server at amazon wynk database
+End Enum
+
+Public Enum eFunction
+    RunSQLPackage = 0 'mysql at amazon vbext database
+    Refresh = 1 'mysql at amazon wynk database
+    WalkArray = 2
+    ShowXLock = 3
+    SetLock = 4
+    GetLock = 5
+End Enum
+
+
+Public Enum esqlconstruct
+    Connection = 0
+    SQL = 1
+    Parameter = 2
+End Enum
+Public Sub XLock()
+     Set my_db = New ado_sql_database_class
+     Dim my_curlockrs As New curlockrs_class
+    
+        Dim lngLocation As Long
+        Dim lngCursorType As Long
+        Dim lngLockType As Long
+         For lngLocation = 2 To 3
+               For lngCursorType = 0 To 3
+                   For lngLockType = 1 To 4
+           
+                        Call AddCursorToCollection(lngLocation, lngCursorType, lngLockType)
+                   Next lngLockType
+               Next lngCursorType
+           Next lngLocation
+    
+End Sub
+'         For Each my_item In mycollection
+'         Debug.Print "-------"
+'            Debug.Print my_item.Cursor_Location
+'            Debug.Print my_item.Lock_Type
+'            Debug.Print my_item.Cursor_Type
+'
+'            Debug.Print my_db.GetLocation(my_item.Cursor_Location)
+'            Debug.Print my_db.GetCursorType(my_item.Lock_Type)
+'            Debug.Print my_db.GetLockType(my_item.Cursor_Type)
+'
+'         Next my_item
+
+       
+
+'Private Sub AddCursorToCollection(p1 As Long, p2 As Long, p3 As Long)
+'    Dim c As curlockrs_class
+'
+'    Set c = New curlockrs_class
+'    With c
+'        .Cursor_Location = p1
+'        .Cursor_Type = p2
+'        .Lock_Type = p3
+'    End With
+'    my_rscurlock.Add c
+'End Sub
+
+Private Sub AddCursorToCollection(p1 As Long, p2 As Long, p3 As Long)
+    Dim c As curlockrs_class
+    Set c = New curlockrs_class
+    With c
+        .Cursor_Location = p1
+        .Cursor_Type = p2
+        .Lock_Type = p3
+    End With
+    mycollection.Add c
+End Sub
+
+'Public Function GetLocation(lngLocation As ADODB.CursorLocationEnum) As String
+' my_curlockrs.Cursor_Location = adUseClient
+' my_curlockrs.Cursor_Type = adOpenKeyset
+' my_curlockrs.Lock_Type = adLockOptimistic
+'Debug.Print GetLocation(lngLocation) & Chr(9) & GetCursorType(lngCursorType) & Chr(9) & GetLockType(lngLockType)
+'                    my_curlockrs.Cursor_Location = lngLocation   'adUseClient
+'                    my_curlockrs.Cursor_Type = lngCursorType      'adOpenDynamic
+'                    my_curlockrs.Lock_Type = lngLockType           'adLockOptimistic
+'                    Debug.Print my_db.GetLocation(my_curlockrs.Cursor_Location)
+'                    Debug.Print my_db.GetCursorType(my_curlockrs.Cursor_Type)
+'                    Debug.Print my_db.GetLockType(my_curlockrs.Lock_Type)
+
+'    Select Case lngLocation
+
+
+ 
+
+
+
+Public Function Get_CommandType(p) As String
+
+    Dim varData As Variant
+    Dim intCounter1 As Integer
+    Dim intCounter2 As Integer
+
+    ' hard code the ADODB Command Type
+    varData = Array( _
+        Array(-1, 1, 2, 4, 8, 256, 512), _
+        Array("adCmdUnspecified", "adCmdText", "adCmdTable", "adCmdStoredProc", "adCmdUnknown", "adCmdFile", "adCmdTableDirect"))
+    ' iterate the array
+    For intCounter1 = LBound(varData, 1) To UBound(varData, 1)
+    Debug.Print intCounter1
+       For intCounter2 = LBound(varData, 2) To UBound(varData, 2)
+'            If p = varData(intCounter1, intCounter2) Then
+'                 'Debug.Print "(" & intCounter1 & ")(" & intCounter2 & ") = " & varData(intCounter1, intCounter2) & varData(2, intCounter2)
+'                        Get_CommandType = varData(2, intCounter2)
+'                        Exit Function
+'            End If
+      Next intCounter2
+    Next intCounter1
+
+End Function
+Public Function rtneConnection(i As Long) As String
+    rtneConnection = _
+        Array("mysql_aws_vbext", _
+                "mysql_aws_wynk", _
+                "mysql_____local", _
+                "access_____local", _
+                "msss_aws_wynk")(i - 0)
+End Function
+Public Function rtnecommandtype(i As Long) As String
+'    adCmdUnspecified = -1    'Does not specify the command type argument.
+'    adCmdText = 1    'Evaluates CommandText as a textual definition of a command or stored procedure call.
+'    adCmdTable = 2   'Evaluates CommandText as a table name whose columns are all returned by an internally generated SQL query.
+'    adCmdStoredProc = 4  'Evaluates CommandText as a stored procedure name.
+'    adCmdUnknown = 8     'Default. Indicates that the type of command in the CommandText property is not known.
+'    adCmdFile = 256  'Evaluates CommandText as the file name of a persistently stored Recordset. Used with Recordset.Open or Requery only.
+'    adCmdTableDirect = 512   'Evaluates CommandText as a table name whose columns are all returned. Used with Recordset.Open or Requery only.
+    rtnecommandtype = _
+        Array("adCmdUnspecified", _
+                "adCmdText", _
+                "adCmdTable", _
+                "adCmdStoredProc", _
+                "adCmdUnknown", _
+                "adCmdFile", _
+                "adCmdTableDirect")(i - 0)
+                 '   varData = [{1, 2, 3; 3, 2, 1; "GFS", "GFS", "GFS"}]
+End Function
+
+
+  Private Sub Create_SQLPackage( _
+        mykey As String, _
+        myconnection As eConnection, _
+        mysql As String, _
+        mycommandtype As ADODB.CommandTypeEnum, _
+        Optional ByRef myparameter As Variant)
+ 
+  Dim cls As New sqlpackagepart_class
+
+        With cls
+            .Key = mykey 'unique key for retrieval
+            .Connection = rtneConnection(myconnection) 'enumeration pick
+            .SQL = mysql 'executable sql or stored procedure
+            .CommandType = mycommandtype 'faster if supplied
+            .Parameter = myparameter 'as variant
+           .CommandType_s = Get_CommandType(mycommandtype)
+            .Parameter_s = prmasstr(.Parameter)
+        End With
+
+    mycollection.Add cls
+ 
+End Sub
+ 
+
+
+
+
+
+Public Function SQL_Packages() As Collection
+'''    'Create_SQLPackage(unique key,ado connection, _
+'''    'executable sql, commandtype, parameter)
+'''
+''''concurrency
+
+ 
+
+
+
+           
+    Call Create_SQLPackage("sqlpackage22", access_____local, _
+        "INSERT INTO tblsqlpackage([key], [connection], [sql], [commandtype_s]," _
+        & " [parameter_s], [commandtype]) values (?, ?, ?, ?, ?, ?);", adCmdText, _
+        Array("key", "connection", "sql", "ad_some", "p1|p2|p3", 8))
+            
+'    Call Create_SQLPackage("sqlpackage6", mysql_aws_wynk, _
+'        "usp_SearchProximity", adCmdStoredProc, _
+'        Array(80919, 2000, "tblperson", "firstname", "son"))
+'
+'    Call Create_SQLPackage("sqlpackage7", mysql_aws_wynk, _
+'        "usp_SearchProximity", adCmdStoredProc, _
+'        Array(80919, 200, "tblclient", "firstname", "e"))
+        
+    Call Create_SQLPackage("sqlpackage1", mysql_aws_wynk, _
+         "SELECT uf_LastCustomerId ();", adCmdUnknown)
+
+
+    Call Create_SQLPackage("sqlpackage2", mysql_aws_wynk, _
+        "usp_INSERTCustomer", adCmdStoredProc, _
+        Array(2567, "Jones", "Mark", "123 Elm", _
+        "Colorado Springs", "CO", "80919", "7192008601", "ext", "notes"))
+'
+    Call Create_SQLPackage("sqlpackage3", mysql_aws_wynk, _
+        "usp_UpdateCustomer", adCmdStoredProc, _
+        Array(1, 2, "Kendal", "Martin", "445 Commerce", "Colorado Springs", _
+        "CO", "80919", "7192008601", "ext", "notes"))
+'''
+    Call Create_SQLPackage("sqlpackage4", mysql_aws_wynk, _
+         "usp_GetCustomer", adCmdStoredProc, Array(37))
+'
+'5 digit zip centroids from public domain data
+    Call Create_SQLPackage("sqlpackage5", mysql_aws_wynk, _
+        "SELECT round(dist_between_zip(uf_Lat(?), uf_Lon(?)," _
+        & "uf_Lat(?), uf_Lon(?)), 0) as dist_between_zip;", adCmdText, _
+        Array(80919, 80919, 80905, 80905))
+
+
+'
+    Call Create_SQLPackage("sqlpackage8", mysql_aws_wynk, _
+       "usp_simplesearch", adCmdStoredProc, Array("tblclient", "lastname", "l"))
+
+    Call Create_SQLPackage("sqlpackage9", mysql_aws_wynk, _
+      "usp_zipcode", adCmdStoredProc, Array(78102))
+'
+    Call Create_SQLPackage("sqlpackage10", mysql_aws_wynk, _
+           "usp_INSERTmodulepart", adCmdStoredProc, _
+           Array("filename", "module", "procedure", "code", "unknown", "loc"))
+'
+    Call Create_SQLPackage("sqlpackage11", mysql_aws_vbext, _
+           "usp_insertsqladolog", adCmdStoredProc, _
+           Array("ttest", "strings", "entered", "logs"))
+'
+''MySQL RDMS
+    Call Create_SQLPackage("sqlpackage12", mysql_aws_wynk, _
+           "SHOW TABLE STATUS;", adCmdUnknown)
+
+    Call Create_SQLPackage("sqlpackage13", mysql_aws_wynk, _
+            "EXPLAIN tblperson;", adCmdUnknown)
+
+    Call Create_SQLPackage("sqlpackage14", mysql_aws_wynk, _
+          "EXPLAIN tblclient;", adCmdUnknown)
+
+    Call Create_SQLPackage("sqlpackage15", mysql_aws_wynk, _
+          "EXPLAIN tblmodulepart;", adCmdUnknown)
+''
+''SQL Server RDMS
+'     Call Create_SQLPackage("sqlpackage16", msss_aws_wynk, _
+'            "SELECT * FROM tblmodulepart WHERE tblmodulepart_pk > ? " _
+'            & "AND tblmodulepart_pk < ?", adCmdUnknown, Array(1, 130))
+'
+'    Call Create_SQLPackage("sqlpackage17", msss_aws_wynk, _
+'            "sp_who", adCmdStoredProc)
+'
+'    Call Create_SQLPackage("sqlpackage18", msss_aws_wynk, _
+'            "sp_tables", adCmdStoredProc)
+
+'tblmodulepart
+    Call Create_SQLPackage("sqlpackage19", mysql_aws_vbext, _
+           "SELECT * FROM tblmodulepart WHERE tblmodulepart_pk > ? " _
+           & "and tblmodulepart_pk < ?;", adCmdUnknown, Array(0, 66663))
+
+    Call Create_SQLPackage("sqlpackage20", mysql_aws_vbext, _
+          "UPDATE vbext.tblpath set name = ? where name <> ?;", adCmdUnknown, _
+          Array("gg", "fffff"))
+
+'Access Jet RDMS
+    Call Create_SQLPackage("sqlpackage21", access_____local, _
+           "SELECT * FROM tblmodulepart where tblmodulepart_pk > ? " _
+           & "and tblmodulepart_pk < ?;", adCmdUnknown, _
+           Array(0, 15000))
+''''
+
+''''
+     Call Create_SQLPackage("sqlpackage31", access_____local, _
+            "INSERT INTO tblmodulepart ([filepath], [module], [procedure]," _
+            & "[code], [kind], [loc]) VALUES (?, ?, ?, ?, ?, ?);", adCmdUnknown, _
+            Array("filepath", "module", "procedure", "code", "kind", "loc"))
+
+    Call Create_SQLPackage("sqlpackage23", access_____local, _
+           "DELETE FROM tblsqlpackage;", adCmdText)
+'''
+    Call Create_SQLPackage("sqlpackage24", mysql_aws_wynk, _
+           "CALL usp_test();", adCmdUnknown)
+
+    Call Create_SQLPackage("sqlpackage25", mysql_aws_wynk, _
+           "SELECT * FROM wynk.tblclient WHERE 1 = 1 LIMIT 10", adCmdUnknown)
+
+    Call Create_SQLPackage("sqlpackage26", mysql_aws_wynk, _
+          "SELECT * FROM tblCustomer WHERE CustomerId >?", adCmdUnknown, Array(5))
+'''
+    Call Create_SQLPackage("sqlpackage27", access_____local, _
+          "SELECT TOP 1000 * FROM tblsqlpackage WHERE 1=1", adCmdText)
+'''
+    Call Create_SQLPackage("sqlpackage28", access_____local, _
+          "SELECT 1 AS Attribute1", adCmdUnknown)
+
+    Call Create_SQLPackage("sqlpackage29", mysql_aws_wynk, _
+          "usp_test();", adCmdUnknown)
+          
+'     Call Create_SQLPackage("sqlpackage30", adCmdUnknown, mysql_aws_wynk, _
+'          "UPDATE wynk.tblskill SET description = ? WHERE description <> ?", _
+'           Use_Parameter("findthis", "andmakeitthis"))
+           
+    Call Create_SQLPackage("sqlpackage31", access_____local, _
+        "INSERT INTO tblmodulepart ([filepath], [module], [procedure]," _
+          & "[code], [kind], [loc]) VALUES (?, ?, ?, ?, ?, ?);", adCmdUnknown, _
+          Array("filepath", "module", "procedure", "code", "kind", "loc"))
+
+    Call Create_SQLPackage("sqlpackage32", mysql_aws_vbext, _
+           "usp_INSERTmodulepart", adCmdUnknown, _
+           Array("fiilename", "module", "procedure", "code", "unknown", "loc"))
+
+    Call Create_SQLPackage("sqlpackage33", mysql_aws_wynk, _
+           "DELETE FROM tblmodulepart WHERE 1=1;", adCmdUnknown)
+
+    Call Create_SQLPackage("sqlpackage34", access_____local, _
+        "INSERT INTO tblmodulepart ([filepath], [module], [procedure]," _
+        & "[code], [kind], [loc]) VALUES (?, ?, ?, ?, ?, ?);", adCmdUnknown, _
+        Array("z:\temp\Office.mdb", "module", "procedure", "code", "kind", "loc"))
+        
+            Call Create_SQLPackage("sqlpackage35", access_____local, _
+          "SELECT * FROM tblsqlpackage;", adCmdText)
+           
+'Access Jet RDMS
+    Call Create_SQLPackage("sqlpackage36", access_____local, _
+           "SELECT * FROM tblmodulepart where tblmodulepart_pk = ?;", _
+           adCmdText, Array(15009))
+'''    '    Call Create_SQLPackage("sqlpackage99", adCmdText, msss_aws_wynk, _
+''''         scripttest)
+    Set SQL_Packages = mycollection
+
+End Function
+
+                               ' myADOSetup.Cursor_Location = adUseClient
+        ' myADOSetup.Cursor_Type = adOpenKeyset
+        ' myADOSetup.Lock_Type = adLockOptimistic
+Public Function Prepare_SQL( _
+        mysqlpackage As sqlpackagepart_class, _
+        Optional ByRef myparameter As Variant) As ADODB.Recordset
+        '------------------------
+        
+        With mysqlpackage
+        
+            If Connect_To(.Connection) Then
+                If IsMissing(myparameter) Then
+                .Parameter = .Parameter
+                
+                ElseIf Not IsMissing(myparameter) Then
+                .Parameter = myparameter
+                
+                End If
+                    Set Prepare_SQL = Execute_SQL(mysqlpackage)
+            End If
+            
+        End With
+
+        Set myrs = Nothing
+        
+End Function
+
+Public Function Prepare_SQLOrig( _
+        mysqlpackage As sqlpackagepart_class, _
+        Optional ByRef myparameter As Variant) As ADODB.Recordset
+        '------------------------
+        If Connect_To(mysqlpackage.Connection) Then
+            If Not IsMissing(myparameter) Then
+                    mysqlpackage.Parameter = myparameter
+                ElseIf IsMissing(myparameter) Then
+                    mysqlpackage.Parameter = mysqlpackage.Parameter
+            End If
+                Set Prepare_SQL = Execute_SQL(mysqlpackage)
+        End If
+
+        Set myrs = Nothing
+        
+End Function
+
+
+Private Function Execute_SQL( _
+        mysqlpackage As sqlpackagepart_class) As ADODB.Recordset
+        '------------------------
+            If (db.State <> adStateOpen) Then
+                    Set Execute_SQL = Nothing
+                    Exit Function
+                    
+                ElseIf (db.State = adStateOpen) Then
+                
+                        With mycommand
+                            .CommandType = adCmdUnknown 'mysqlpackage.CommandType
+                            .CommandText = mysqlpackage.SQL
+                            .Prepared = True
+                            ' If the Prepared property of the Command object
+                            ' is set to True and the Command object is bound
+                            ' to an open connection when you set the CommandText
+                            ' property, ADO prepares the query (that is, a compiled form
+                            ' of the query that is stored by the provider) when you call
+                            ' the Execute or Open methods.
+                            .ActiveConnection = db
+                                If Not (IsNull(mysqlpackage.Parameter)) Then
+                                    For Each myitem In mysqlpackage.Parameter
+                                        Set myparameter = .CreateParameter _
+                                        (, adVarChar, adParamInput, Len(myitem), myitem)
+                                         .Parameters.Append myparameter
+                                    Next
+                                End If
+                        End With
+
+                   With myrecordset
+                         .LockType = my_curlockrs.Lock_Type
+                         .CursorType = my_curlockrs.Cursor_Type
+                         .CursorLocation = my_curlockrs.Cursor_Location
+                         .Open mycommand
+                   End With
+
+                  '  myrecordset.Open mycommand
+                    mysqlpackage.Setup = myrecordset
+
+                    Set Execute_SQL = myrecordset
+
+                    Set myrecordset = Nothing
+                    Set myparameter = Nothing
+                    Set mycommand = Nothing
+            End If
+        
+End Function
+Public Sub Set_CursorLockRS( _
+        lngLocation As ADODB.CursorLocationEnum, _
+        lngCursorType As ADODB.CursorTypeEnum, _
+        lngLockType As ADODB.LockTypeEnum)
+        '------------------------
+        my_curlockrs.Cursor_Location = lngLocation
+        my_curlockrs.Cursor_Type = lngCursorType
+        my_curlockrs.Lock_Type = lngLockType
+End Sub
+'Public Function Set_CursorLockRS(my_Cursor_Location As ecursorlocation, my_Cursor_Type As ecursortype, my_Lock_Type As elocktype)
+'
+'            my_curlockrs.Cursor_Location = my_Cursor_Location
+'            my_curlockrs.Cursor_Type = my_Cursor_Type
+'            my_curlockrs.Lock_Type = my_Lock_Type
+'End Function
+
+ Public Sub ExcelOutput( _
+        myrs As ADODB.Recordset, _
+        mystartrow As Integer, _
+        mystartcol As Integer)
+    '------------------------
+    myrs.MoveFirst
+    
+              Do While Not myrs.EOF
+                      mystartrow = mystartrow + 1
+                        For col = 0 To myrs.Fields.Count - 1
+                          objExcelWorkBook.ActiveSheet.Cells(mystartrow, _
+                          mystartcol + col).Value = myrs(col).Value
+                        Next
+              myrs.MoveNext
+              Loop
+End Sub
+  Public Sub RecordSet_To_Excel( _
+            myrs As ADODB.Recordset, _
+            mystartrow As Integer, _
+            mystartcol As Integer, _
+            my_sqlpackage As Variant)
+  '------------------------
+            Set my_db = New ado_sql_database_class
+
+                Dim c As Integer
+myrs.MoveLast
+myrs.MoveFirst
+
+           If myrs.Fields.Count > 0 Then
+              If Not myrs.BOF And Not myrs.EOF Then
+
+                With my_db
+                
+                    .StartExcel True
+                    .CreateWorkbook "z:\temp\" & my_sqlpackage.Key & ".xlsx", True
+                    
+                    For c = 0 To myrs.Fields.Count - 1
+                        .InsertValue mystartrow, c + 3, myrs.Fields(c).Name
+                    Next c
+                    
+                    .ExcelOutput myrs, mystartrow, mystartcol
+                    
+                    .FormatExcel
+                    
+                    .CloseWorkbook True
+                    .CloseExcel
+                    
+                 End With
+                 
+                 End If
+                
+                End If
+                 
+
+
+End Sub
+
+Public Function CursorLockRS() As VBA.Collection
+        Set my_db = New ado_sql_database_class
+        Dim lngLocation As Long
+        Dim lngCursorType As Long
+        Dim lngLockType As Long
+        
+            For lngLocation = 2 To 3
+                For lngCursorType = 0 To 3
+                    For lngLockType = 1 To 4
+                    Call AddCursorToCollection(lngLocation, lngCursorType, lngLockType)
+                    Next lngLockType
+                Next lngCursorType
+            Next lngLocation
+        
+        Set CursorLockRS = my_rscurlock
+End Function
+
+
+
+                     '  Debug.Print "-------------------------"
+                           'Debug.Print GetLocation(lngLocation) & Chr(9) & GetCursorType(lngCursorType) & Chr(9) & GetLockType(lngLockType)
+        '                    myADOSetup.Cursor_Location = lngLocation   'adUseClient
+        '                    myADOSetup.Cursor_Type = lngCursorType      'adOpenDynamic
+        '                    myADOSetup.Lock_Type = lngLockType           'adLockOptimistic
+               ''''''''             Call AddCursorToCollection(lngLocation, lngCursorType, lngLockType)
+        '                    Debug.Print my_db.GetLocation(myADOSetup.Cursor_Location)
+        '                    Debug.Print my_db.GetCursorType(myADOSetup.Cursor_Type)
+        '                    Debug.Print my_db.GetLockType(myADOSetup.Lock_Type)
+        
+'             For Each my_item In mycollection
+'             Debug.Print "-------"
+'                Debug.Print my_item.Cursor_Location
+'                Debug.Print my_item.Lock_Type
+'                Debug.Print my_item.Cursor_Type
+'
+'                Debug.Print my_db.GetLocation(my_item.Cursor_Location)
+'                Debug.Print my_db.GetLockType(my_item.Lock_Type);
+'                Debug.Print my_db.GetCursorType(my_item.Cursor_Type);
+'
+'             Next my_item
+
+
+
+Public Function scripttest() As String
+
+    Dim mycollection As New Collection
+    Dim v As String
+    v = "IF EXISTS (SELECT * FROM sys.objects WHERE type = 'P' AND name = 'usp_MissingSequence')" & vbCrLf _
+    & "DROP PROCEDURE usp_MissingSequence" & vbCrLf
+    mycollection.Add v
+    mycollection.Add "Create Procedure usp_MissingSequence" & vbCrLf _
+    & "/*" & vbCrLf _
+    & "usp_MissingSequence 'seq', 'tbl_FolderListing'" & vbCrLf _
+    & "sp_helptext 'usp_MissingSequence'" & vbCrLf _
+    & "*/" & vbCrLf _
+    & "(" & vbCrLf _
+    & "@field varchar(35)," & vbCrLf _
+    & "@table varchar(35)" & vbCrLf _
+    & ")" & vbCrLf _
+    & "as" & vbCrLf _
+    & "declare @sql varchar(700)" & vbCrLf _
+    & "set @sql = 'select ' + @field + ' + 1 as Seq_Begin,(select min(' + @field + ') - 1 from '" & vbCrLf _
+    & "+ @table + ' as f3 where f3.' + @field + ' > (select min(' + @field + ') from '  + @table + ')'" & vbCrLf _
+    & " + 'and not exists(select * from '" & vbCrLf _
+    & " + @table + ' as f4 where f4.' + @field + ' = f3.' + @field + ' - 1) and f3.'" & vbCrLf _
+    & " + @field +' - 1 >= f1.' + @field + ' + 1) as Seq_End from ' + @table + ' as f1 where '" & vbCrLf _
+    & " + @field + ' < (select max(' + @field + ') from ' + @table +')and not exists(select * from '" & vbCrLf _
+    & " + @table + ' as f2 where f2.' + @field +' = f1.'+ @field +' + 1) order by Seq_Begin'" & vbCrLf _
+    & "EXEC(@sql)"
+    scripttest = mycollection.item(2)
+End Function
+
+
+  
+
+''                    Debug.Print "---G---" & _
+''                 GetLocation(myrecordset.LockType) & ", " & _
+''                 GetCursorType(myrecordset.CursorType) & ", " & _
+''                 GetLockType(myrecordset.CursorLocation)
+
+'my_rscurlock.Lock_Type        '
+'my_rscurlock.Cursor_Type    'adOpenDynamic 'myADOSetup.type '
+'my_rscurlock.Cursor_Location
+
+' Private Sub Create_SQLPackageOrig( _
+'        mykey As String, _
+'        mycommandtype As ADODB.CommandTypeEnum, _
+'        myconnection As eConnection, _
+'        mysql As String, _
+'        Optional ByRef myparameter As Variant)
+'
+'  Dim cls As New sqlpackagepart_class
+'
+'        With cls
+'            .Key = mykey
+'            .Connection = rtneConnection(myconnection)
+'            .SQL = mysql
+'            .Parameter = myparameter
+'            .CommandType = mycommandtype
+'        End With
+'
+'    mycollection.Add cls
+'mycommandtype As ADODB.CommandTypeEnum,
+'End Sub
+' Private Sub Create_SQLPackage(my_key As String, mycommandtype As ADODB.CommandTypeEnum, myconnection As eConnection, mysql As String, Optional ByRef myparameter As Variant)
+'
+'  Dim cls As New sqlpackagepart_class
+'
+'        With cls
+'            .Key = my_key
+'            .Connection = rtneConnection(myconnection)
+'            .SQL = mysql
+'            .Parameter = myparameter
+'            .CommandType = mycommandtype
+'        End With
+'
+'    mycollection.Add cls
+'
+'End Sub
+' Private Sub Create_SQLPackage( _
+'            mykey As String, _
+'            myconnection As eConnection, _
+'            mycommandtype As ADODB.CommandTypeEnum, _
+'            mysql As String, _
+'            Optional ByRef myparameter As Variant)
+'            Stop
+'  Dim cls As New sqlpackagepart_class
+'
+'        With cls
+'            .Key = mykey
+'            .Connection = rtneConnection(myconnection)
+'            .SQL = mysql
+'
+'            .CommandType = mycommandtype
+'            .Parameter = myparameter
+'        End With
+'
+'    mycollection.Add cls
+'
+'End Sub
+
+Public Sub testUse_Parameter()
+    Call WithParameter("q", "w", "e", "r", "t", "y")
+End Sub
+
+ Public Function Use_Parameter(ParamArray keys() As Variant)
+
+'    Dim i As Integer
+'    For i = LBound(keys, 1) To UBound(keys, 1)
+'        ' Debug.Print keys(i)
+'    Next i
+'
+    Use_Parameter = keys()
+
+End Function
+
+
+    Public Function rtnconnectionstring(myconnection As String) As String
+    
+        Select Case myconnection
+ 
+        
+            Case "mysql_aws_vbext"
+                     rtnconnectionstring = "driver={MySQL ODBC 5.3 Unicode Driver};" _
+                     & "server=dbinstance23.cfbzoyx0w5lp.us-west-1.rds.amazonaws.com;" _
+                     & "uid=user88;" _
+                     & "pwd=notarealpassword;database=vbext"
+            Case "mysql_aws_wynk"
+                     rtnconnectionstring = "driver={MySQL ODBC 5.3 Unicode Driver};" _
+                     & "server=dbinstance23.cfbzoyx0w5lp.us-west-1.rds.amazonaws.com;" _
+                     & "uid=masterusername23;pwd=elephantmemorY123!;database=wynk"
+            Case "mysql_____local"
+                    rtnconnectionstring = "driver={MySQL ODBC 5.3 Unicode Driver};server=127.0.0.1;" _
+                    & "uid=root;pwd=root;database=wynk"
+            Case "access_____local"
+                     rtnconnectionstring = Application.CurrentProject.Connection.ConnectionString
+            Case "msss_aws_wynk"
+                     rtnconnectionstring = "driver={SQL Server};" _
+                     & "server=ssinstance10.cfbzoyx0w5lp.us-west-1.rds.amazonaws.com;" _
+                     & "uid=masterusername;pwd=password;database=wynk"
+        End Select
+    
+    End Function
+Public Function Connect_To(myconnection) As Boolean
+    Connect_To = dbopen(CStr(myconnection))
+End Function
+
+Private Function dbopen(myconnection As String) As Boolean
+    Set db = New ADODB.Connection
+    db.Open rtnconnectionstring(myconnection)
+    dbopen = (db.State = adStateOpen)
+End Function
+
+
+Public Sub test_rtn_eConnection()
+
+    Dim i As Integer
+    For i = 0 To 4
+        Debug.Print rtnconnectionstring(rtn_eConnection(CInt(i)))
+    Next i
+    
+    End Sub
+    'use the open method of connection object
+    'Debug.Print "--------------->" & db.State
+'    Debug.Print cnnNwind.Properties.Count & _
+'“ {SQL Server|Jet} Connection Properties”
+
+'For Each prpProp In db.Properties
+'Debug.Print prpProp.Name
+'Debug.Print prpProp.Value
+'Next prpProp
+
+Private Sub Class_Initialize()
+   ' Dim myclass As New sqlpackagepart_class
+End Sub
+Public Function to_debug_window(mysqlpackage As sqlpackagepart_class)
+    Debug.Print "--------------------to_debug_window----------------------"
+    Debug.Print mysqlpackage.Key
+    Debug.Print mysqlpackage.Connection
+    Debug.Print rtnconnectionstring(mysqlpackage.Connection)
+    Debug.Print mysqlpackage.SQL
+    Debug.Print prmasstr(mysqlpackage.Parameter)
+End Function
+
+
+Public Function prmasstr(myitem As Variant) As Variant
+    If IsNull(myitem) Then
+        prmasstr = "Null"
+      Else
+        prmasstr = Join(myitem, " | ") '        prmasstr = Join(o, " ||| ")
+    End If
+End Function
+Public Function strasprm(myitem As Variant) As Variant
+    If IsNull(myitem) Then
+        strasprm = "Null"
+      Else
+        strasprm = Split(myitem, " | ")
+    End If
+End Function
+
+
+Public Sub CreateWorkbook(strName As String, fSave As Boolean)
+
+  Set objExcelWorkBook = objExcel.Workbooks.Add
+  objExcelWorkBook.SaveAs filename:=strName
+    With objExcel.ActiveSheet
+
+        .Cells.Font.Size = "12"
+        .Cells.RowHeight = "12"
+    End With
+End Sub
+Public Sub InsertValue(prow As Integer, pCol As Integer, varValue As String)
+    With objExcel.ActiveSheet
+        .Cells(prow, pCol).Value = varValue
+    End With
+End Sub
+Public Sub CloseWorkbook(fSave As Boolean)
+  objExcelWorkBook.Close SaveChanges:=fSave
+End Sub
+Public Sub CloseExcel()
+  objExcel.Quit
+  Set objExcel = Nothing
+End Sub
+Public Sub FormatExcel()
+      With objExcel.ActiveSheet
+        .Cells.EntireColumn.AutoFit
+    End With
+End Sub
+Public Sub StartExcel(fVisible As Boolean)
+  Set objExcel = New Excel.Application
+  objExcel.Visible = fVisible
+End Sub
+
+
+Public Function Iterate_RecordSet(ByVal myrs As ADODB.Recordset) As Boolean
+           If myrs.Fields.Count > 0 Then
+              If Not myrs.BOF And Not myrs.EOF Then
+'                     Iterate_RecordSet = True
+'                    ' Exit Function
+                       While (Not myrs.EOF)
+                   
+
+                                Debug.Print String(40, "|")
+                                For Each myitem In myrs.Fields
+                                  Debug.Print myitem.Name & " =  " & myitem.Value
+                                Next myitem
+                            myrs.MoveNext
+                       Wend
+''
+                    End If
+'
+'                   ElseIf myrs.Fields.Count = 0 Then
+'
+'                   'Debug.Print "myrs.Fields.Count = 0"
+         End If
+End Function
+'my_sqlpackage As sqlpackagepart_class
+'Optional my_parameter As Variant
+'Debug.Print cnnNwind.Properties.Count & _
+'“ {SQL Server|Jet} Connection Properties”
+'For Each prpProp In cnnNwind.Properties
+'Debug.Print prpProp.Name & “ = “ & prpProp.Value
+'Next prpProp
+'3. Press Ctrl+G to open the
+'Public Function Run_SQL(my_sqlpackage As sqlpackagepart_class, Optional my_parameter As Variant) As ADODB.Recordset
+'            'Set myrs = Prepare_SQL(my_sqlpackage, my_parameter)
+'           Set Run_SQL = Prepare_SQL(my_sqlpackage, my_parameter)
+'End Function
+
+
+Public Function GetLocation(lngLocation As ADODB.CursorLocationEnum) As String
+
+    Select Case lngLocation
+        Case adUseServer
+            GetLocation = "Server side"
+        Case adUseClient
+            GetLocation = "Client side"
+    End Select
+End Function
+Public Function GetCursorType(lngCursorType As ADODB.CursorTypeEnum) As String
+
+    Select Case lngCursorType
+        Case adOpenForwardOnly
+            GetCursorType = "Forward-only"
+        Case adOpenKeyset
+            GetCursorType = "Keyset"
+        Case adOpenDynamic
+            GetCursorType = "Dynamic"
+        Case adOpenStatic
+            GetCursorType = "Static"
+    End Select
+End Function
+Public Function GetLockType(lngLockType As ADODB.LockTypeEnum) As String
+
+    Select Case lngLockType
+        Case adLockReadOnly
+            GetLockType = "Read only"
+        Case adLockPessimistic
+            GetLockType = "Pessimistic"
+        Case adLockOptimistic
+            GetLockType = "Optimistic"
+        Case adLockBatchOptimistic
+            GetLockType = "Batch optimistic"
+    End Select
+End Function
+
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+''''Public Function Prepare_SQLOrig(mysqlpackage As sqlpackagepart_class, Optional ByRef Parameter As Variant) As ADODB.Recordset
+''''        If Connect_To(mysqlpackage.Connection) Then
+''''
+''''                If IsMissing(Parameter) Then 'mistake here
+''''                       myparameter = mysqlpackage.Parameter 'programmer is using a variable outside the class
+''''                    ElseIf Not IsMissing(Parameter) Then 'defeating purpose of class
+''''                       myparameter = Parameter
+''''                End If
+''''
+''''                mysqlpackage.Parameter = myparameter
+''''                Set myrs = Execute_SQL(mysqlpackage.SQL, myparameter)
+''''                Set Prepare_SQL = myrs
+''''        End If
+''''        Set myrs = Nothing
+''''End Function
+Private Sub db_InfoMessage(ByVal pError As ADODB.Error, adStatus As ADODB.EventStatusEnum, ByVal pConnection As ADODB.Connection)
+
+End Sub
